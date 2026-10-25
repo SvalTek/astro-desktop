@@ -90,6 +90,27 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-0 libnotify-bin zenity libayatana-appindicator3-1 wl-clipboard xsel xdg-utils libglib2.0-bin xvfb xauth dbus-x11 dunst python3-dbus python3-gi
+      - name: Ensure Windows WebView2 Runtime
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $runtimeKeys = @(
+            'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}',
+            'HKCU:\Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          )
+          function Get-WebViewVersion {
+            Get-ItemProperty -Path $runtimeKeys -Name pv -ErrorAction SilentlyContinue |
+              Where-Object { $_.pv -and [version]$_.pv -gt [version]'0.0.0.0' } |
+              Select-Object -ExpandProperty pv -First 1
+          }
+          if (-not (Get-WebViewVersion)) {
+            $webviewInstaller = Join-Path $env:RUNNER_TEMP 'MicrosoftEdgeWebview2Setup.exe'
+            Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $webviewInstaller
+            $webviewInstallerProcess = Start-Process -FilePath $webviewInstaller -ArgumentList '/silent', '/install' -WindowStyle Hidden -Wait -PassThru
+            if ($webviewInstallerProcess.ExitCode -ne 0) { throw "WebView2 installer exited with $($webviewInstallerProcess.ExitCode)" }
+          }
+          if (-not (Get-WebViewVersion)) { throw 'WebView2 Runtime is not installed' }
+          Write-Output "WebView2 Runtime: $(Get-WebViewVersion)"
       - name: Build and test relocated Windows package
         if: runner.os == 'Windows'
         run: bun run test:package --target=${{ matrix.target }} --offline
