@@ -107,6 +107,8 @@ Pass the display environment in the active WSLg session. If an earlier service l
 
 ## Check the result before sharing it
 
+GitHub Actions also produces these packages automatically. See [CI and releases](CI.md) for PR artifacts, testing prereleases from develop, and main releases.
+
 Run `bun run check` during development. To exercise a package on the build host, use `bun run test:package --offline`; it builds, copies the distributable to a temporary directory, launches a real test WebView, and closes it. Cross-compiled executables must be tested on their target OS. A compiled `--smoke-test` argument runs the native integration checks and closes its test window.
 
 Inspect your own branding, window behavior, notification settings, dialogs, and file workflows as well. Installers, code signing, and platform installation/registration are responsibilities of the application you make from this template. See [Contributing](Contributing.md) for all verification commands and details of the supplied tests.

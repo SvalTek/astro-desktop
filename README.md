@@ -33,7 +33,7 @@ Start with the [documentation home](docs/README.md), or jump to the part you wan
 | [Desktop events](docs/DesktopEvents.md) | Await native operations and push backend changes into the interface. |
 | [File dialogs](docs/FileDialogs.md) · [Notifications](docs/Notifications.md) | Let users choose paths and receive native notifications. |
 | [System tray](docs/Tray.md) · [Desktop tools](docs/DesktopTools.md) | Add tray actions, clipboard operations, folder lookup, and shell integration. |
-| [Packaging](docs/Packaging.md) | Build and distribute Windows/Linux executables and native assets. |
+| [Packaging](docs/Packaging.md) · [CI and releases](docs/CI.md) | Build, test, and download Windows/Linux packages. |
 
 ---
 

@@ -63,7 +63,12 @@ try {
     env.HTTP_PROXY = "http://127.0.0.1:9";
     env.HTTPS_PROXY = "http://127.0.0.1:9";
   }
-  const launched = Bun.spawn([executable, "--smoke-test"], {
+  // CI uses a private D-Bus tray host/notification server on Linux. The system
+  // Python has the distribution's GI/D-Bus modules installed by the workflow.
+  const command = process.platform === "linux" && process.env.NATIVE_TRAY_TEST_HOST === "1"
+    ? ["/usr/bin/python3", join(root, "tests", "fixtures", "linux-tray-host.py"), executable]
+    : [executable, "--smoke-test"];
+  const launched = Bun.spawn(command, {
     cwd,
     env,
     stdout: "pipe",
