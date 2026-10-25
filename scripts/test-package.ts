@@ -1,4 +1,4 @@
-import { cp, mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readdir, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,7 +19,8 @@ const build = Bun.spawn([process.execPath, "run", "build", ...args], {
 if (await build.exited) throw new Error("Package build failed");
 
 // Copy only the distributable into a new directory, with an unrelated working directory.
-const temporary = await mkdtemp(join(tmpdir(), "astro-desktop-package-"));
+const tempRoot = await realpath(tmpdir());
+const temporary = await mkdtemp(join(tempRoot, "astro-desktop-package-"));
 const appDir = join(temporary, "application with spaces");
 const cwd = join(temporary, "unrelated working directory");
 let child: ReturnType<typeof Bun.spawn> | undefined;
@@ -54,6 +55,8 @@ try {
     HTTP_PROXY: "",
     HTTPS_PROXY: "",
     NO_PROXY: "localhost,127.0.0.1",
+    TEMP: tempRoot,
+    TMP: tempRoot,
   };
   delete env.ASTRO_DEV_ORIGIN;
   delete env.WEBUI_PORT;
@@ -110,7 +113,7 @@ try {
   child?.kill();
   // Delete only the fresh, task-owned temporary directory created above.
   if (
-    !resolve(temporary).startsWith(resolve(tmpdir()) + sep) ||
+    !resolve(temporary).startsWith(resolve(tempRoot) + sep) ||
     !temporary.includes("astro-desktop-package-")
   )
     throw new Error("Invalid package test cleanup path");
