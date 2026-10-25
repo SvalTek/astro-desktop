@@ -122,16 +122,6 @@ jobs:
           WEBKIT_DISABLE_DMABUF_RENDERER: '1'
           NATIVE_TRAY_TEST_HOST: '1'
         run: xvfb-run -a -s '-screen 0 1280x900x24' bun run test:package --target=${{ matrix.target }} --offline
-      - name: Diagnose Windows source startup after a package failure
-        if: failure() && runner.os == 'Windows'
-        timeout-minutes: 3
-        run: |
-          Write-Output "Runner session: $([System.Diagnostics.Process]::GetCurrentProcess().SessionId)"
-          bun scripts/test-native.ts
-          Write-Output 'Checking compiled startup with the normal runner environment'
-          $env:BACKEND_PORT = '0'
-          $compiledProbe = Get-ChildItem -LiteralPath build -Filter '*-windows-x64.exe' | Select-Object -First 1
-          & $compiledProbe.FullName --smoke-test
       - name: Create release archive and checksum
         run: bun scripts/package-release.ts --target=${{ matrix.target }}
       - name: Upload package

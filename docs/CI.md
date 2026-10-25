@@ -10,6 +10,8 @@ Linux runs its native checks inside Xvfb with the private D-Bus tray host and no
 
 Failed browser runs upload diagnostic files when present. A failed check or package job prevents release publication.
 
+On a fresh Windows runner, a WebView initialization failure before the app is ready gets one process restart with the same empty `PATH` and offline settings. Smoke assertion failures are not retried, and a second startup failure fails the job.
+
 The browser/native smoke tests exercise the starter screens. When replacing those screens in your own app, update their selectors and scenarios alongside the interface.
 
 ## Download a build

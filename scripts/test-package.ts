@@ -71,50 +71,38 @@ try {
   const command = process.platform === "linux" && process.env.NATIVE_TRAY_TEST_HOST === "1"
     ? ["/usr/bin/python3", join(root, "tests", "fixtures", "linux-tray-host.py"), executable]
     : [executable, "--smoke-test"];
-  const launched = Bun.spawn(command, {
-    cwd,
-    env,
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  child = launched;
-  const stdout = new Response(launched.stdout).text();
-  const stderr = new Response(launched.stderr).text();
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const code = await Promise.race([
-    child.exited,
-    new Promise<never>((_, reject) => {
-      timer = setTimeout(() => {
-        child?.kill();
-        reject(new Error("Packaged app timed out"));
-      }, 120_000);
-    }),
-  ]).finally(() => clearTimeout(timer));
-  const output = await stdout;
-  const errors = await stderr;
+  async function runPackage() {
+    const launched = Bun.spawn(command, { cwd, env, stdout: "pipe", stderr: "pipe" });
+    child = launched;
+    const stdout = new Response(launched.stdout).text();
+    const stderr = new Response(launched.stderr).text();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const code = await Promise.race([
+      launched.exited,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          launched.kill();
+          reject(new Error("Packaged app timed out"));
+        }, 120_000);
+      }),
+    ]).finally(() => clearTimeout(timer));
+    return { code, output: await stdout, errors: await stderr };
+  }
+  let result = await runPackage();
+  const startupFailure = Bun.stripANSI(result.errors).match(/^error: WebUI could not open a WebView[:.].*$/m);
+  // Fresh hosted Windows machines can fail their first WebView initialization.
+  // Retry only that pre-ready failure, once, with the exact same restrictions.
+  // A failed smoke assertion or a second startup failure still fails the job.
+  if (process.env.CI === "true" && options.os === "windows" && result.code !== 0 &&
+      !result.output.includes(" ready:") && startupFailure) {
+    console.warn(`Cold Windows WebView startup failed before readiness; restarting the same package once. ${startupFailure[0]}`);
+    await Bun.sleep(1000);
+    result = await runPackage();
+  }
+  const { code, output, errors } = result;
   if (output) console.log(output.trimEnd());
   if (errors) console.error(errors.trimEnd());
-  if (code !== 0) {
-    if (process.env.CI === "true" && options.os === "windows") {
-      const variants = [
-        ["same environment retry", {}],
-        ["normal PATH, offline proxies", { PATH: process.env.PATH }],
-        ["empty PATH, no proxy", { HTTP_PROXY: "", HTTPS_PROXY: "" }],
-        ["system PATH, offline proxies", { PATH: join(process.env.SystemRoot || "C:\\Windows", "System32") }],
-      ] as const;
-      for (const [label, override] of variants) {
-        const probe = Bun.spawn([executable, "--smoke-test"], { cwd, env: { ...env, ...override }, stdout: "pipe", stderr: "pipe" });
-        const probeOut = new Response(probe.stdout).text();
-        const probeErr = new Response(probe.stderr).text();
-        const probeTimer = setTimeout(() => probe.kill(), 45_000);
-        const result = await probe.exited.finally(() => clearTimeout(probeTimer));
-        console.log(`Windows startup diagnostic (${label}): ${result}`);
-        console.log((await probeOut).trimEnd());
-        if (result !== 0) console.error((await probeErr).slice(-1800));
-      }
-    }
-    throw new Error(`Packaged app exited with ${code}`);
-  }
+  if (code !== 0) throw new Error(`Packaged app exited with ${code}`);
   if (!output.includes("PASS native close button closes the window"))
     throw new Error("Packaged smoke checks did not finish");
   const library = Bun.file(join(appDir, options.archive, options.library));
