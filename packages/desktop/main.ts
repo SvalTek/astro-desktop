@@ -86,7 +86,7 @@ export async function runDesktop(
       );
     if (!window.showWebView(origin))
       throw new Error(
-        "WebUI could not open a WebView. Check the platform WebView runtime.",
+        `WebUI could not open a WebView: ${WebUI.getLastErrorMessage() || "check the platform WebView runtime"} (${WebUI.getLastErrorNumber()}).`,
       );
     console.log(`${AppConfig.appName} ${AppConfig.appVersion} ready: ${origin} (WebUI bridge ${bridgePort})`);
     let failure: Error | undefined;
