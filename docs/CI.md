@@ -4,7 +4,7 @@ The template's [GitHub Actions workflow](../.github/workflows/ci.yml) runs for p
 
 ## What each run checks
 
-Both platforms install the committed lockfile, check TypeScript/Astro/Vue, run unit and worker tests, and run the browser integration tests in Chromium. Package jobs then compile offline builds and exercise a relocated native WebView package before creating download archives.
+Both platforms install the committed lockfile, check TypeScript/Astro/Vue, and run unit and worker tests. Browser integration uses Chromium on Linux and the runner's installed Microsoft Edge on Windows. Package jobs then compile offline builds and exercise a relocated native WebView package before creating download archives.
 
 Linux runs its native checks inside Xvfb with the private D-Bus tray host and notification fixture. This checks the actual GTK/WebUI bridge and native menu callback without needing a desktop panel on the runner. Windows runs its native package check directly. Native smoke checks do not require a user to choose a file or click a toast.
 

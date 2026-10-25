@@ -44,8 +44,11 @@ jobs:
       - name: Unit and worker tests
         run: bun run test
       - name: Install browser
+        if: runner.os == 'Linux'
         run: bunx --no-install playwright install --with-deps chromium
       - name: Browser integration tests
+        env:
+          PLAYWRIGHT_CHANNEL: ${{ runner.os == 'Windows' && 'msedge' || '' }}
         run: bun run test:e2e
       - name: Keep test diagnostics
         if: failure()
