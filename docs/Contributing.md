@@ -35,6 +35,10 @@ Native tests require a graphical session and the host WebView/runtime tools. The
 
 Use tests relevant to the change. Documentation-only work should verify examples, paths, and links rather than launch every native integration test.
 
+## Automated verification
+
+The [CI workflow](CI.md) runs checks and native package tests on Windows/Linux for branch pushes and PRs, then publishes the appropriate branch release after success.
+
 ## Test tray menu delivery on Linux
 
 The Linux tray fixture creates a private D-Bus watcher and notification service, launches the compiled app, and invokes its exported native menu item. It can test menu delivery on WSLg without claiming the real desktop's tray host:

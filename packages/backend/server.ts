@@ -19,8 +19,8 @@ export function startServer(
           .map((file) => [file.name.slice("frontend/".length), file]),
       )
     : undefined;
-  const insideRoot = (path: string) => {
-    const local = relative(root, path);
+  const insideRoot = (path: string, base = root) => {
+    const local = relative(base, path);
     return (
       !isAbsolute(local) &&
       local !== ".." &&
@@ -119,7 +119,9 @@ export function startServer(
       for (const candidate of [path, resolve(path, "index.html")]) {
         try {
           const actual = await realpath(candidate);
-          if (!insideRoot(actual)) continue;
+          // Both sides must use canonical paths. Windows temp directories can
+          // have short-name aliases; a configured root can also be a symlink.
+          if (!insideRoot(actual, await realpath(root))) continue;
           const file = Bun.file(actual);
           if (!(await file.stat()).isFile()) continue;
           return new Response(request.method === "HEAD" ? null : file, {

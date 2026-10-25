@@ -1,4 +1,4 @@
-import { cp, mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readdir, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,7 +19,8 @@ const build = Bun.spawn([process.execPath, "run", "build", ...args], {
 if (await build.exited) throw new Error("Package build failed");
 
 // Copy only the distributable into a new directory, with an unrelated working directory.
-const temporary = await mkdtemp(join(tmpdir(), "astro-desktop-package-"));
+const tempRoot = await realpath(tmpdir());
+const temporary = await mkdtemp(join(tempRoot, "astro-desktop-package-"));
 const appDir = join(temporary, "application with spaces");
 const cwd = join(temporary, "unrelated working directory");
 let child: ReturnType<typeof Bun.spawn> | undefined;
@@ -54,6 +55,8 @@ try {
     HTTP_PROXY: "",
     HTTPS_PROXY: "",
     NO_PROXY: "localhost,127.0.0.1",
+    TEMP: tempRoot,
+    TMP: tempRoot,
   };
   delete env.ASTRO_DEV_ORIGIN;
   delete env.WEBUI_PORT;
@@ -63,27 +66,40 @@ try {
     env.HTTP_PROXY = "http://127.0.0.1:9";
     env.HTTPS_PROXY = "http://127.0.0.1:9";
   }
-  const launched = Bun.spawn([executable, "--smoke-test"], {
-    cwd,
-    env,
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  child = launched;
-  const stdout = new Response(launched.stdout).text();
-  const stderr = new Response(launched.stderr).text();
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const code = await Promise.race([
-    child.exited,
-    new Promise<never>((_, reject) => {
-      timer = setTimeout(() => {
-        child?.kill();
-        reject(new Error("Packaged app timed out"));
-      }, 120_000);
-    }),
-  ]).finally(() => clearTimeout(timer));
-  const output = await stdout;
-  const errors = await stderr;
+  // CI uses a private D-Bus tray host/notification server on Linux. The system
+  // Python has the distribution's GI/D-Bus modules installed by the workflow.
+  const command = process.platform === "linux" && process.env.NATIVE_TRAY_TEST_HOST === "1"
+    ? ["/usr/bin/python3", join(root, "tests", "fixtures", "linux-tray-host.py"), executable]
+    : [executable, "--smoke-test"];
+  async function runPackage() {
+    const launched = Bun.spawn(command, { cwd, env, stdout: "pipe", stderr: "pipe" });
+    child = launched;
+    const stdout = new Response(launched.stdout).text();
+    const stderr = new Response(launched.stderr).text();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const code = await Promise.race([
+      launched.exited,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          launched.kill();
+          reject(new Error("Packaged app timed out"));
+        }, 120_000);
+      }),
+    ]).finally(() => clearTimeout(timer));
+    return { code, output: await stdout, errors: await stderr };
+  }
+  let result = await runPackage();
+  const startupFailure = Bun.stripANSI(result.errors).match(/^error: WebUI could not open a WebView[:.].*$/m);
+  // Fresh hosted Windows machines can fail their first WebView initialization.
+  // Retry only that pre-ready failure, once, with the exact same restrictions.
+  // A failed smoke assertion or a second startup failure still fails the job.
+  if (process.env.CI === "true" && options.os === "windows" && result.code !== 0 &&
+      !result.output.includes(" ready:") && startupFailure) {
+    console.warn(`Cold Windows WebView startup failed before readiness; restarting the same package once. ${startupFailure[0]}`);
+    await Bun.sleep(1000);
+    result = await runPackage();
+  }
+  const { code, output, errors } = result;
   if (output) console.log(output.trimEnd());
   if (errors) console.error(errors.trimEnd());
   if (code !== 0) throw new Error(`Packaged app exited with ${code}`);
@@ -105,7 +121,7 @@ try {
   child?.kill();
   // Delete only the fresh, task-owned temporary directory created above.
   if (
-    !resolve(temporary).startsWith(resolve(tmpdir()) + sep) ||
+    !resolve(temporary).startsWith(resolve(tempRoot) + sep) ||
     !temporary.includes("astro-desktop-package-")
   )
     throw new Error("Invalid package test cleanup path");

@@ -29,6 +29,7 @@ Native components are already registered by the host. Your frontend can call the
 | [System tray](Tray.md) | Brand the tray icon, compose menus, and keep a window available while hidden. |
 | [Desktop tools](DesktopTools.md) | Copy text, find user/application directories, open paths, and move files to Trash. |
 | [Packaging](Packaging.md) | Build Windows/Linux executables and distribute their required native assets. |
+| [CI and releases](CI.md) | Run automated checks and download PR builds, main releases, or develop testing builds. |
 
 The repository's `docs/` directory teaches developers using the template. The starter application's `/docs/` route is a separate MDX example; replace it with your own application's content.
 

@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdtemp, mkdir, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startServer } from "../packages/backend/server";
@@ -77,6 +77,27 @@ test("static server serves Astro routes and assets with correct methods, without
   const bridge = await fetch(new URL("/webui.js", server.url));
   expect(bridge.status).toBe(200);
   expect(await bridge.text()).toContain("Browser preview");
+});
+
+test("static roots can resolve through directory aliases without allowing links outside the root", async () => {
+  const temp = await mkdtemp(join(tmpdir(), "astro-static-alias-"));
+  cleanups.push(() => rm(temp, { recursive: true, force: true }));
+  const assets = join(temp, "assets");
+  const outside = join(temp, "outside");
+  const alias = join(temp, "alias");
+  await mkdir(assets);
+  await mkdir(outside);
+  await Bun.write(join(assets, "index.html"), "<h1>Alias works</h1>");
+  await Bun.write(join(outside, "secret.txt"), "private");
+  const kind = process.platform === "win32" ? "junction" : "dir";
+  await symlink(assets, alias, kind);
+  await symlink(outside, join(assets, "escape"), kind);
+  const { server } = startServer({ port: 0, assetsDir: alias });
+  cleanups.push(() => server.stop(true));
+  expect(await (await fetch(server.url)).text()).toContain("Alias works");
+  const escaped = await fetch(new URL("/escape/secret.txt", server.url));
+  expect(escaped.status).toBe(404);
+  expect(await escaped.text()).not.toContain("private");
 });
 
 test("bridge route forwards the native WebUI script and reports upstream failure", async () => {
