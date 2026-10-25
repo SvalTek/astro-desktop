@@ -94,7 +94,27 @@ try {
   const errors = await stderr;
   if (output) console.log(output.trimEnd());
   if (errors) console.error(errors.trimEnd());
-  if (code !== 0) throw new Error(`Packaged app exited with ${code}`);
+  if (code !== 0) {
+    if (process.env.CI === "true" && options.os === "windows") {
+      const variants = [
+        ["same environment retry", {}],
+        ["normal PATH, offline proxies", { PATH: process.env.PATH }],
+        ["empty PATH, no proxy", { HTTP_PROXY: "", HTTPS_PROXY: "" }],
+        ["system PATH, offline proxies", { PATH: join(process.env.SystemRoot || "C:\\Windows", "System32") }],
+      ] as const;
+      for (const [label, override] of variants) {
+        const probe = Bun.spawn([executable, "--smoke-test"], { cwd, env: { ...env, ...override }, stdout: "pipe", stderr: "pipe" });
+        const probeOut = new Response(probe.stdout).text();
+        const probeErr = new Response(probe.stderr).text();
+        const probeTimer = setTimeout(() => probe.kill(), 45_000);
+        const result = await probe.exited.finally(() => clearTimeout(probeTimer));
+        console.log(`Windows startup diagnostic (${label}): ${result}`);
+        console.log((await probeOut).trimEnd());
+        if (result !== 0) console.error((await probeErr).slice(-1800));
+      }
+    }
+    throw new Error(`Packaged app exited with ${code}`);
+  }
   if (!output.includes("PASS native close button closes the window"))
     throw new Error("Packaged smoke checks did not finish");
   const library = Bun.file(join(appDir, options.archive, options.library));
