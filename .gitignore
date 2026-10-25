@@ -1,0 +1,14 @@
+node_modules
+/.bun-cache/
+dist/
+/build/
+/bundle/
+.astro/
+.astro-dev/
+.logs/
+*.log
+test-results/
+playwright-report/
+.env
+.env.*
+!.env.example
